@@ -66,7 +66,7 @@ func (e *libvirt) LoadDomain(ctx context.Context, image string, env map[string]s
 		return nil, "", "", "", fmt.Errorf("Could not find uuid element in domain XML")
 	}
 	{
-		e := uuidEl.RemoveChild(uuidEl)
+		e := doc.RemoveChild(uuidEl)
 		if e == nil {
 			return nil, "", "", "", fmt.Errorf("Could not find uuid element in domain XML")
 		}
