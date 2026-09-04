@@ -72,7 +72,7 @@ func (e *libvirt) LoadDomain(ctx context.Context, image string, env map[string]s
 		}
 		e := domainEl.RemoveChild(uuidEl)
 		if e == nil {
-			return nil, "", "", "", fmt.Errorf("Could not find uuid element in domain XML")
+			return nil, "", "", "", fmt.Errorf("Could not remove uuid element in domain XML")
 		}
 	}
 
