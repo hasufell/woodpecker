@@ -66,7 +66,7 @@ func (e *libvirt) LoadDomain(ctx context.Context, image string, env map[string]s
 		if domainEl == nil {
 			return nil, "", "", "", fmt.Errorf("Could not find domain element in domain XML")
 		}
-		uuidEl := domainEl.FindElement("/uuid")
+		uuidEl := doc.FindElement("/domain/uuid")
 		if uuidEl == nil {
 			return nil, "", "", "", fmt.Errorf("Could not find uuid element in domain XML")
 		}
