@@ -61,12 +61,16 @@ func (e *libvirt) LoadDomain(ctx context.Context, image string, env map[string]s
 	newName = fmt.Sprintf("%s-%s", image, stepUUID)
 	nameEl.SetText(newName)
 	// need to remove the domain UUID now for libvirt to generate a random one
-	uuidEl := doc.FindElement("/domain/uuid")
-	if uuidEl == nil {
-		return nil, "", "", "", fmt.Errorf("Could not find uuid element in domain XML")
-	}
 	{
-		e := doc.RemoveChild(uuidEl)
+		domainEl := doc.FindElement("/domain")
+		if domainEl == nil {
+			return nil, "", "", "", fmt.Errorf("Could not find domain element in domain XML")
+		}
+		uuidEl := domainEl.FindElement("/uuid")
+		if uuidEl == nil {
+			return nil, "", "", "", fmt.Errorf("Could not find uuid element in domain XML")
+		}
+		e := domainEl.RemoveChild(uuidEl)
 		if e == nil {
 			return nil, "", "", "", fmt.Errorf("Could not find uuid element in domain XML")
 		}
