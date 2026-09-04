@@ -28,32 +28,40 @@ import (
 	virt "libvirt.org/go/libvirt"
 )
 
-func (e *libvirt) LoadDomain(ctx context.Context, image string, env map[string]string, ephemeral bool, sharedDisk SharedDisk, taskUUID string, stepUUID string) (outDomain *virt.Domain, guestOS string, uuid string, err error) {
+func (e *libvirt) LoadDomain(ctx context.Context, image string, env map[string]string, persistent bool, sharedDisk SharedDisk, taskUUID string, stepUUID string) (outDomain *virt.Domain, newName string, guestOS string, uuid string, err error) {
 	domain, err := e.conn.LookupDomainByName(image)
 
 	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", "", err
 	}
 
 	defer domain.Free()
 
 	guestOS, err = getGuestOS(domain)
 	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", "", err
 	}
 
 	// get the XML from the loaded domain
 	xml, err := domain.GetXMLDesc(virt.DOMAIN_XML_INACTIVE)
 	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", "", err
 	}
 	// parse the XML into etree
 	doc := etree.NewDocument()
 	if err := doc.ReadFromString(xml); err != nil {
-		return nil, "", "", err
+		return nil, "", "", "", err
 	}
 
-	if ephemeral {
+	// change the name of the vm to avoid clashes
+	nameEl := doc.FindElement("/domain/name")
+	if nameEl == nil {
+		return nil, "", "", "", fmt.Errorf("Could not find name element in domain XML")
+	}
+	newName = fmt.Sprintf("%s-%s", image, stepUUID)
+	nameEl.SetText(newName)
+
+	if !persistent {
 		log.Debug().Msgf("Setting up ephemeral disks")
 		// replacing all the disks with temporary ones
 		el := doc.FindElements("/domain/devices/disk[@type='file'][@device='disk']")
@@ -81,7 +89,7 @@ func (e *libvirt) LoadDomain(ctx context.Context, image string, env map[string]s
 			baseImgName := fmt.Sprintf(baseImagePattern, devAttr.Value, taskUUID, stepUUID, filepath.Ext(fileAttr.Value))
 			newImg, err := e.FromBaseImage(ctx, fileAttr.Value, baseImgName, false)
 			if err != nil {
-				return nil, "", "", err
+				return nil, "", "", "", err
 			}
 			sourceEl.CreateAttr("file", newImg)
 		}
@@ -90,12 +98,12 @@ func (e *libvirt) LoadDomain(ctx context.Context, image string, env map[string]s
 	// get devices element
 	devices := doc.FindElement("/domain/devices")
 	if devices == nil {
-		return nil, "", "", fmt.Errorf("Could not find devices in domain XML")
+		return nil, "", "", "", fmt.Errorf("Could not find devices in domain XML")
 	}
 
 	domainType, err := GetDomainType(ctx, domain)
 	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", "", err
 	}
 
 	var disk string
@@ -110,7 +118,7 @@ func (e *libvirt) LoadDomain(ctx context.Context, image string, env map[string]s
 
 		disk, err = e.FromBaseImage(ctx, diskPath, fmt.Sprintf(sharedDiskPattern, taskUUID, filepath.Ext(sharedDisk.Disk)), false)
 		if err != nil {
-			return nil, "", "", err
+			return nil, "", "", "", err
 		}
 
 		log.Debug().Msgf("Inserting shared disk: %s", sharedDisk.Disk)
@@ -127,7 +135,7 @@ func (e *libvirt) LoadDomain(ctx context.Context, image string, env map[string]s
 
 		disk, diskUuid, err = e.CreateSharedDisk(ctx, guestOS, domainType, diskSize, taskUUID)
 		if err != nil {
-			return nil, "", "", err
+			return nil, "", "", "", err
 		}
 	}
 
@@ -163,7 +171,7 @@ func (e *libvirt) LoadDomain(ctx context.Context, image string, env map[string]s
 		if diskUuid == "" {
 			diskUuid, err = GetDiskUUID(disk, domainType)
 			if err != nil {
-				return nil, "", "", err
+				return nil, "", "", "", err
 			}
 		}
 
@@ -174,19 +182,19 @@ func (e *libvirt) LoadDomain(ctx context.Context, image string, env map[string]s
 	// insert
 	sharedXmlDoc := etree.NewDocument()
 	if err := sharedXmlDoc.ReadFromString(diskXml); err != nil {
-		return nil, "", "", err
+		return nil, "", "", "", err
 	}
 	devices.AddChild(sharedXmlDoc.Root())
 
 	newXml, err := doc.WriteToString()
 	log.Debug().Msgf("New domain XML: %s", newXml)
 	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", "", err
 	}
 
 	domain, err = e.conn.DomainCreateXML(newXml, virt.DOMAIN_NONE)
 
-	return domain, uuid, guestOS, err
+	return domain, newName, uuid, guestOS, err
 }
 
 // Get the ip address we can SSH connect to.

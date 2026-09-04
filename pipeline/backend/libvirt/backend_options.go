@@ -24,7 +24,7 @@ import (
 type BackendOptions struct {
 	SSHConfig  SSHConfig  `mapstructure:"ssh_config"`
 	SharedDisk SharedDisk `mapstructure:"shared_disk"`
-	Ephemeral  bool       `mapstructure:"ephemeral"`
+	Persistent bool       `mapstructure:"persistent"`
 }
 
 type SSHConfig struct {

@@ -410,7 +410,7 @@ docs-dependencies: ## Install docs dependencies
 
 .PHONY: generate-docs
 generate-docs: ## Generate docs (currently only for the cli)
-	CGO_ENABLED=0 go generate cmd/cli/app.go
+	CGO_ENABLED=${CGO_ENABLED} go generate cmd/cli/app.go
 	CGO_ENABLED=0 go generate cmd/server/openapi.go
 
 .PHONY: build-docs

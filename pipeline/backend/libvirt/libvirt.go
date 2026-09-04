@@ -173,7 +173,7 @@ func (e *libvirt) StartStep(ctx context.Context, step *backend_types.Step, taskU
 		log.Error().Err(err).Msg("could not parse backend options")
 	}
 
-	domain, uuid, guestOS, err := e.LoadDomain(ctx, step.Image, step.Environment, options.Ephemeral, options.SharedDisk, taskUUID, step.UUID)
+	domain, domainName, uuid, guestOS, err := e.LoadDomain(ctx, step.Image, step.Environment, options.Persistent, options.SharedDisk, taskUUID, step.UUID)
 	if err != nil {
 		return err
 	}
@@ -219,7 +219,7 @@ func (e *libvirt) StartStep(ctx context.Context, step *backend_types.Step, taskU
 		sshAddr = ip.Addr
 	} else {
 		// we rely on libvirt NSS module
-		sshAddr = step.Image
+		sshAddr = domainName
 	}
 
 	sshPw, ok := step.Environment["LIBVIRT_SSH_PW"]
@@ -516,7 +516,7 @@ func (e *libvirt) DestroyStep(ctx context.Context, step *backend_types.Step, tas
 			ephemeralImgs := filepath.Join(libvirtImgDir, fmt.Sprintf(baseImagePattern, "*", taskUUID, step.UUID, ".*"))
 			matches, err := filepath.Glob(ephemeralImgs)
 			if err != nil {
-				log.Debug().Msgf("Error while unlocking step mutex: %s", err.Error())
+				log.Debug().Msg(err.Error())
 			}
 
 			for _, m := range matches {
