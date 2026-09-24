@@ -130,7 +130,7 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 		// remove them from the pipelineItems, which are determining the queue tasks later
 		for ix, item := range pipelineItems {
 			for _, lastWorkflow := range lastPipeline.Workflows {
-				if item.Workflow.Name == lastWorkflow.Name && item.Workflow.AxisID == lastWorkflow.AxisID && lastWorkflow.State == model.StatusSuccess {
+				if item.Workflow != nil && item.Workflow.Name == lastWorkflow.Name && item.Workflow.AxisID == lastWorkflow.AxisID && lastWorkflow.State == model.StatusSuccess {
 					pipelineItems = slices.Delete(pipelineItems, ix, ix+1)
 				}
 			}
