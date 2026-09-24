@@ -557,6 +557,14 @@ func PostPipeline(c *gin.Context) {
 	_store := store.FromContext(c)
 	repo := session.Repo(c)
 	pl := session.Pipeline(c)
+	{
+		var err error
+		pl.Workflows, err = _store.WorkflowGetTree(pl)
+		if err != nil {
+			handleDBError(c, err)
+			return
+		}
+	}
 
 	user, err := _store.GetUser(repo.UserID)
 	if err != nil {

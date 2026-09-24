@@ -67,6 +67,7 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 	newPipeline.Parent = lastPipeline.Number
 	newPipeline.RerunCount++
 	newPipeline.Version = version.String()
+	newPipeline.Workflows = nil
 
 	err = store.CreatePipeline(newPipeline)
 	if err != nil {
@@ -138,6 +139,7 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 
 	publishPipeline(ctx, forge, newPipeline, repo, user)
 
+	log.Debug().Msgf("lastPipeline: %+v", *lastPipeline)
 	// debugging
 	for _, workflow := range failedWorkflows {
 		log.Debug().Msgf("failed workflow: %+v", *workflow)
@@ -148,6 +150,7 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 		// filter pipeline items if we only want to restart failed jobs, for example
 		for _, item := range pipelineItems {
 			log.Debug().Msgf("item: %+v", *item)
+			log.Debug().Msgf("item workflow: %+v", *item.Workflow)
 			for _, workflow := range failedWorkflows {
 				if item.Workflow.Name == workflow.Name && item.Workflow.AxisID == workflow.AxisID {
 					filteredPipelineItems = append(filteredPipelineItems, item)
