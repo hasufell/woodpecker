@@ -131,7 +131,7 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 		for ix, item := range pipelineItems {
 			for _, lastWorkflow := range lastPipeline.Workflows {
 				if item.Workflow.Name == lastWorkflow.Name && item.Workflow.AxisID == lastWorkflow.AxisID && lastWorkflow.State == model.StatusSuccess {
-					slices.Delete(pipelineItems, ix, ix+1)
+					pipelineItems = slices.Delete(pipelineItems, ix, ix+1)
 				}
 			}
 		}
