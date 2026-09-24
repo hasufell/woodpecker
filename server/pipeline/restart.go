@@ -152,6 +152,9 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 		filteredPipelineItems = pipelineItems
 	}
 
+	log.Debug().Msgf("pipelineItems: %+v", pipelineItems)
+	log.Debug().Msgf("filteredPipelineItems: %+v", filteredPipelineItems)
+
 	newPipeline, err = start(ctx, forge, store, newPipeline, user, repo, filteredPipelineItems)
 	if err != nil {
 		msg := fmt.Sprintf("failure to start pipeline for %s", repo.FullName)
