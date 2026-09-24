@@ -552,6 +552,7 @@ func GetPipelineQueue(c *gin.Context) {
 //	@Param			pipeline_number	path	int		true	"the number of the pipeline"
 //	@Param			event			query	string	false	"override the event type"
 //	@Param			deploy_to		query	string	false	"override the target deploy value"
+//	@Param			failed_only			query	bool	false	"Only restart failed workflows"
 func PostPipeline(c *gin.Context) {
 	_store := store.FromContext(c)
 	repo := session.Repo(c)
@@ -593,7 +594,7 @@ func PostPipeline(c *gin.Context) {
 	for key, val := range c.Request.URL.Query() {
 		switch key {
 		// Skip some options of the endpoint
-		case "fork", "event", "deploy_to":
+		case "fork", "event", "deploy_to", "failed_only":
 			continue
 		default:
 			// We only accept string literals, because pipeline parameters will be
@@ -603,7 +604,8 @@ func PostPipeline(c *gin.Context) {
 		}
 	}
 
-	newPipeline, err := pipeline.Restart(c, _store, pl, user, repo, envs)
+	failedOnly, _ := strconv.ParseBool(c.Query("failed_only"))
+	newPipeline, err := pipeline.Restart(c, _store, pl, user, repo, envs, failedOnly)
 	if err != nil {
 		handlePipelineErr(c, err)
 	} else {
