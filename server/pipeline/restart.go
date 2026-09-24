@@ -21,7 +21,6 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/builder"
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	forge_types "go.woodpecker-ci.org/woodpecker/v3/server/forge/types"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
@@ -104,23 +103,29 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 		return nil, errors.New(msg)
 	}
 
-	var failedWorkflows []*model.Workflow
+	newPipeline, pipelineItems, parseErr, err := createPipelineItems(ctx, forge, store, newPipeline, user, repo, pipelineFiles, envs, false)
+	// if we restart failed workflows only, we just mark all the succeeded ones
+	// in the new pipelines
 	if failedOnly {
+		var succeededWorkflows []*model.Workflow
 		for _, workflow := range lastPipeline.Workflows {
 			switch workflow.State {
-			case model.StatusSkipped:
-				failedWorkflows = append(failedWorkflows, workflow)
-			case model.StatusFailure:
-				failedWorkflows = append(failedWorkflows, workflow)
-			case model.StatusKilled:
-				failedWorkflows = append(failedWorkflows, workflow)
-			case model.StatusCanceled:
-				failedWorkflows = append(failedWorkflows, workflow)
+			case model.StatusSuccess:
+				succeededWorkflows = append(succeededWorkflows, workflow)
+			}
+		}
+
+		for ix, workflow := range newPipeline.Workflows {
+			for _, lastWorkflow := range lastPipeline.Workflows {
+				if workflow.Name == lastWorkflow.Name && workflow.AxisID == lastWorkflow.AxisID && lastWorkflow.State == model.StatusSuccess {
+					newPipeline.Workflows[ix].State = lastWorkflow.State
+					newPipeline.Workflows[ix].Started = lastWorkflow.Started
+					newPipeline.Workflows[ix].Finished = lastWorkflow.Finished
+				}
 			}
 		}
 	}
 
-	newPipeline, pipelineItems, parseErr, err := createPipelineItems(ctx, forge, store, newPipeline, user, repo, pipelineFiles, envs, false)
 	if handleParseErrors(newPipeline, parseErr) {
 		if newPipeline, uErr := UpdateToStatusError(store, *newPipeline, parseErr); uErr != nil {
 			log.Error().Err(uErr).Msgf("error setting error status of pipeline for %s#%d", repo.FullName, newPipeline.Number)
@@ -139,32 +144,7 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 
 	publishPipeline(ctx, forge, newPipeline, repo, user)
 
-	log.Debug().Msgf("lastPipeline: %+v", *lastPipeline)
-	// debugging
-	for _, workflow := range failedWorkflows {
-		log.Debug().Msgf("failed workflow: %+v", *workflow)
-	}
-
-	var filteredPipelineItems []*builder.Item
-	if failedOnly {
-		// filter pipeline items if we only want to restart failed jobs, for example
-		for _, item := range pipelineItems {
-			log.Debug().Msgf("item: %+v", *item)
-			log.Debug().Msgf("item workflow: %+v", *item.Workflow)
-			for _, workflow := range failedWorkflows {
-				if item.Workflow.Name == workflow.Name && item.Workflow.AxisID == workflow.AxisID {
-					filteredPipelineItems = append(filteredPipelineItems, item)
-				}
-			}
-		}
-	} else {
-		filteredPipelineItems = pipelineItems
-	}
-
-	log.Debug().Msgf("pipelineItems: %+v", pipelineItems)
-	log.Debug().Msgf("filteredPipelineItems: %+v", filteredPipelineItems)
-
-	newPipeline, err = start(ctx, forge, store, newPipeline, user, repo, filteredPipelineItems)
+	newPipeline, err = start(ctx, forge, store, newPipeline, user, repo, pipelineItems)
 	if err != nil {
 		msg := fmt.Sprintf("failure to start pipeline for %s", repo.FullName)
 		log.Error().Err(err).Msg(msg)
