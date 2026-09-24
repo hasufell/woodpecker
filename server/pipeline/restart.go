@@ -138,10 +138,16 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 
 	publishPipeline(ctx, forge, newPipeline, repo, user)
 
+	// debugging
+	for _, workflow := range failedWorkflows {
+		log.Debug().Msgf("failed workflow: %+v", *workflow)
+	}
+
 	var filteredPipelineItems []*builder.Item
 	if failedOnly {
 		// filter pipeline items if we only want to restart failed jobs, for example
 		for _, item := range pipelineItems {
+			log.Debug().Msgf("item: %+v", *item)
 			for _, workflow := range failedWorkflows {
 				if item.Workflow.Name == workflow.Name && item.Workflow.AxisID == workflow.AxisID {
 					filteredPipelineItems = append(filteredPipelineItems, item)
