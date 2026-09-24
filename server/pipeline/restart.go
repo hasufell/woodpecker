@@ -18,10 +18,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/rs/zerolog/log"
 
+	"go.woodpecker-ci.org/woodpecker/v3/pipeline/frontend/builder"
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	forge_types "go.woodpecker-ci.org/woodpecker/v3/server/forge/types"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
@@ -123,18 +123,26 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 					newPipeline.Workflows[ix].State = lastWorkflow.State
 					newPipeline.Workflows[ix].Started = lastWorkflow.Started
 					newPipeline.Workflows[ix].Finished = lastWorkflow.Finished
+					store.WorkflowUpdate(newPipeline.Workflows[ix])
 				}
 			}
 		}
 
 		// remove them from the pipelineItems, which are determining the queue tasks later
-		for ix, item := range pipelineItems {
+		newPipelineItems := []*builder.Item{}
+		for _, item := range pipelineItems {
 			for _, lastWorkflow := range lastPipeline.Workflows {
-				if item.Workflow != nil && item.Workflow.Name == lastWorkflow.Name && item.Workflow.AxisID == lastWorkflow.AxisID && lastWorkflow.State == model.StatusSuccess {
-					pipelineItems = slices.Delete(pipelineItems, ix, ix+1)
+				if item != nil &&
+					item.Workflow != nil &&
+					item.Workflow.Name == lastWorkflow.Name &&
+					item.Workflow.AxisID == lastWorkflow.AxisID &&
+					lastWorkflow.State != model.StatusSuccess {
+					newPipelineItems = append(newPipelineItems, item)
 				}
 			}
 		}
+
+		pipelineItems = newPipelineItems
 	}
 
 	if handleParseErrors(newPipeline, parseErr) {
