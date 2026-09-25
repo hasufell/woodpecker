@@ -105,8 +105,7 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 	}
 
 	newPipeline, pipelineItems, parseErr, err := createPipelineItems(ctx, forge, store, newPipeline, user, repo, pipelineFiles, envs, false)
-	// if we restart failed workflows only, we just mark all the succeeded ones
-	// in the new pipelines
+	// we only want to restart failed pipelines
 	if failedOnly {
 		var succeededWorkflows []*model.Workflow
 		for _, workflow := range lastPipeline.Workflows {
@@ -116,13 +115,14 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 			}
 		}
 
-		// set the succeeded workflows in the new pipeline
+		// skip workflows that succeeded in the previous pipeline
 		for ix, workflow := range newPipeline.Workflows {
 			for _, lastWorkflow := range lastPipeline.Workflows {
-				if workflow.Name == lastWorkflow.Name && workflow.AxisID == lastWorkflow.AxisID && lastWorkflow.State == model.StatusSuccess {
-					newPipeline.Workflows[ix].State = lastWorkflow.State
-					newPipeline.Workflows[ix].Started = lastWorkflow.Started
-					newPipeline.Workflows[ix].Finished = lastWorkflow.Finished
+				if workflow.Name == lastWorkflow.Name &&
+					workflow.AxisID == lastWorkflow.AxisID &&
+					lastWorkflow.State == model.StatusSuccess {
+
+					newPipeline.Workflows[ix].State = model.StatusSkipped
 					store.WorkflowUpdate(newPipeline.Workflows[ix])
 				}
 			}
@@ -137,6 +137,13 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 					item.Workflow.Name == lastWorkflow.Name &&
 					item.Workflow.AxisID == lastWorkflow.AxisID &&
 					lastWorkflow.State != model.StatusSuccess {
+
+					// flip all dependencies to optional, because
+					// we might be skipping them if they succeeded
+					for ix := range item.DependsOn {
+						item.DependsOn[ix].Optional = true
+					}
+
 					newPipelineItems = append(newPipelineItems, item)
 				}
 			}
